@@ -1,0 +1,89 @@
+CC ?= g++
+TARGET = hive
+CFLAGS = -g -Wall -DDEBUG -fPIC
+LIBFLAGS = -pthread -ldl -lrt
+SHARED := -fPIC -shared  
+
+LUA_CLIB_PATH ?= luaclib
+CSERVICE_PATH ?= cservice
+CSERVICE = snlua 
+LUA_CLIB = hive tcpserver
+
+# lua
+LUA_STATICLIB := 3rd/lua/src/liblua.a
+LUA_LIB ?= $(LUA_STATICLIB)
+LUA_INC ?= 3rd/lua/src
+
+
+BINPATH = bin
+# 头文件目录寻找顺序
+VPATH = src service-src lualib-src
+INCLUDE_H = -Isrc -Iservice-src -Ilualib-src
+
+SRC = ae.c \
+	  anet.c \
+	  blockqueue.c \
+	  buffer.c \
+	  circqueue.c \
+	  context.c \
+	  dict.c \
+	  handle.c \
+	  harbor.c \
+	  main.c \
+	  module.c \
+	  queue.c \
+	  session.c \
+	  tcp_client.c \
+	  tcp_server.c \
+	  thread.c \
+	  zmalloc.c \
+
+OBJ = $(SRC:.c=.o)
+DEP = $(SRC:.c=.d)
+
+all: $(TARGET) \
+  $(foreach v, $(CSERVICE), $(CSERVICE_PATH)/$(v).so) \
+  $(foreach v, $(LUA_CLIB), $(LUA_CLIB_PATH)/$(v).so) 
+# mkdir 
+$(LUA_CLIB_PATH) :
+	mkdir $(LUA_CLIB_PATH)
+
+$(CSERVICE_PATH) :
+	mkdir $(CSERVICE_PATH)
+
+## hive
+$(TARGET): $(OBJ) 
+	@echo "start build hive..."
+	$(CC) $(CFLAGS) $(LIBFLAGS) $(addprefix $(BINPATH)/, $(OBJ)) -g -o $@ 
+
+$(DEP): %.d: %.c 
+	@set -e; rm -f $(BINPATH)/$@; \
+	$(CC) -MM $< > $(BINPATH)/$@; \
+
+-include $(DEP)
+
+$(OBJ): %.o: %.c 
+	$(CC) -c -fpic $(CFLAGS) $< -o $(BINPATH)/$@
+
+## cservice
+define CSERVICE_TEMP
+  $$(CSERVICE_PATH)/$(1).so : service_$(1).c | $$(CSERVICE_PATH) 
+	@echo "" 
+	@echo "start build service_$(1)..." 
+	$(CC) $$(CFLAGS) $$(SHARED) $$< $$(LUA_LIB) -g -o $$@ -lm -lrt  -Isrc
+
+endef
+
+$(foreach v, $(CSERVICE), $(eval $(call CSERVICE_TEMP,$(v))))
+
+##lua_clib
+$(LUA_CLIB_PATH)/hive.so: lualib-src/lua-hive.c lualib-src/lua-seri.c $(OBJ) 
+	$(CC) $(CFLAGS) $(SHARED) $< -o $@  $(INCLUDE_H) 
+
+$(LUA_CLIB_PATH)/tcpserver.so: lualib-src/lua-tcpserver.c $(OBJ) 
+	$(CC) $(CFLAGS) $(SHARED) $< -o $@  $(INCLUDE_H) 
+
+.PHONY: clean
+clean:
+	rm -f $(BINPATH)/*.o $(BINPATH)/*.d $(TARGET)
+

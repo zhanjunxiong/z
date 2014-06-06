@@ -1,0 +1,44 @@
+==38733== Memcheck, a memory error detector
+==38733== Copyright (C) 2002-2013, and GNU GPL'd, by Julian Seward et al.
+==38733== Using Valgrind-3.9.0 and LibVEX; rerun with -h for copyright info
+==38733== Command: ./z
+==38733== Parent PID: 37764
+==38733== 
+==38733== 
+==38733== HEAP SUMMARY:
+==38733==     in use at exit: 176 bytes in 2 blocks
+==38733==   total heap usage: 19,405 allocs, 19,403 frees, 11,398,054 bytes allocated
+==38733== 
+==38733== 32 bytes in 1 blocks are still reachable in loss record 1 of 2
+==38733==    at 0x4A0580F: calloc (vg_replace_malloc.c:618)
+==38733==    by 0x3EA700130F: _dlerror_run (in /lib64/libdl-2.12.so)
+==38733==    by 0x3EA7000EE0: dlopen@@GLIBC_2.2.5 (in /lib64/libdl-2.12.so)
+==38733==    by 0x40D1B4: _tryOpen (module.c:52)
+==38733==    by 0x40D4FD: moduleQuery (module.c:109)
+==38733==    by 0x409A8F: contextCreate (context.c:20)
+==38733==    by 0x40CC09: bootstrap (main.c:205)
+==38733==    by 0x40CE2D: main (main.c:283)
+==38733== 
+==38733== 144 bytes in 1 blocks are still reachable in loss record 2 of 2
+==38733==    at 0x4A06AAA: malloc (vg_replace_malloc.c:291)
+==38733==    by 0x347B01283B: add_to_global (in /lib64/ld-2.12.so)
+==38733==    by 0x347B012D6C: dl_open_worker (in /lib64/ld-2.12.so)
+==38733==    by 0x347B00E1B5: _dl_catch_error (in /lib64/ld-2.12.so)
+==38733==    by 0x347B0124F9: _dl_open (in /lib64/ld-2.12.so)
+==38733==    by 0x3EA7000F65: dlopen_doit (in /lib64/libdl-2.12.so)
+==38733==    by 0x347B00E1B5: _dl_catch_error (in /lib64/ld-2.12.so)
+==38733==    by 0x3EA700129B: _dlerror_run (in /lib64/libdl-2.12.so)
+==38733==    by 0x3EA7000EE0: dlopen@@GLIBC_2.2.5 (in /lib64/libdl-2.12.so)
+==38733==    by 0x40D1B4: _tryOpen (module.c:52)
+==38733==    by 0x40D4FD: moduleQuery (module.c:109)
+==38733==    by 0x409A8F: contextCreate (context.c:20)
+==38733== 
+==38733== LEAK SUMMARY:
+==38733==    definitely lost: 0 bytes in 0 blocks
+==38733==    indirectly lost: 0 bytes in 0 blocks
+==38733==      possibly lost: 0 bytes in 0 blocks
+==38733==    still reachable: 176 bytes in 2 blocks
+==38733==         suppressed: 0 bytes in 0 blocks
+==38733== 
+==38733== For counts of detected and suppressed errors, rerun with: -v
+==38733== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 28 from 7)

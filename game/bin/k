@@ -1,0 +1,27 @@
+#! /usr/local/bin/lua
+
+package.cpath = '../../luaclib/?.so;' .. package.cpath
+
+package.path = './?.lua;' .. package.path
+package.path = '../../lualib/?.lua;' .. package.path
+package.path = '../?.lua;' .. package.path
+package.path = '../etc/?.lua;' .. package.path
+
+if arg[1] == 'help' or arg[1] == nil then
+    print([[
+    k command [options]
+
+    Commands:
+    start        启动全部服务
+    stop         关闭全部服务
+    re           重启所有服务
+
+    create_table    创建数据库
+
+    ]])
+    os.exit(0)
+else
+	local mod = string.gsub(arg[1], ".lua", "")
+	require(mod)
+end
+

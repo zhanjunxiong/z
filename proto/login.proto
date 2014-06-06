@@ -1,0 +1,12 @@
+package login;
+message LOGIN
+{
+	// @send
+	required int32 uid = 1;
+	optional string password = 2;
+
+	// @recv
+	// 0 登陆成功
+	// -1 登录失败
+	optional int32 errno = 4;
+}

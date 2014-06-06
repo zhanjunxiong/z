@@ -1,0 +1,10 @@
+[2014-05-28 02:28:38:500528][main][LOG] ========== start z, pid: 28859 ===============
+[2014-05-28 02:28:38:697251][main][LOG] start work thread id: 0
+[2014-05-28 02:28:38:698299][main][LOG] start work thread id: 1
+[2014-05-28 02:28:38:698410][main][LOG] start work thread id: 2
+[2014-05-28 02:28:38:698488][main][LOG] start work thread id: 3
+[2014-05-28 02:28:38:698561][main][LOG] start timer thread
+[2014-05-28 02:28:39:237590][bootstrap][LOG] bootstrap succ!
+[2014-05-28 02:28:59:961108][main][LOG] start stop...
+[2014-05-28 02:28:59:969873][main][LOG] start stop work thread
+[2014-05-28 02:28:59:980252][main][LOG] stop timer thread

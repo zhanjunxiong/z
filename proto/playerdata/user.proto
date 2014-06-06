@@ -1,0 +1,7 @@
+package playerdata.user;
+
+message User 
+{
+	required int32 uid = 1;
+	optional string name = 2;
+}
