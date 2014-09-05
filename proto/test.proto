@@ -1,7 +1,0 @@
-package lm;
-message test
-{
-	required int32 uid = 1;
-	optional string param1 = 3;
-	optional string param2 = 4;
-}

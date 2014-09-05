@@ -1,7 +1,0 @@
-thread_num=4
-
-zlua_path='lualib/?.lua;service/?.lua;game/?.lua;game/etc/?.lua;'
-zlua_cpath='luaclib/?.so;3rdlib/?.so;'
-proto_path='proto'
-luaservice='service/?.lua;game/hall-srv/?.lua;game/login-srv/?.lua'
-
