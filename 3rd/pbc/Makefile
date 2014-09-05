@@ -1,5 +1,6 @@
 CC = g++
-CFLAGS = -O2 -fPIC --shared
+##CFLAGS = -O2 -fPIC --shared
+CFLAGS = -O2 
 AR = ar rc
 
 BUILD = build

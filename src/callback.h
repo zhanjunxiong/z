@@ -1,23 +1,16 @@
 #ifndef CALLBACK_H_
 #define CALLBACK_H_
 
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdlib.h>
+#include "define.h"
 
 struct session;
 struct buffer;
-typedef void(*connectionCallback)(struct session*);
-typedef void(*closeCallback)(struct session*);
-typedef void(*writeCompleteCallback)(struct session*);
-typedef void(*hightWaterMarkCallback)(struct session*, size_t);
+typedef void(*connectionCallback)(struct session*, void*);
+typedef void(*closeCallback)(struct session*, void*);
+typedef void(*writeCompleteCallback)(struct session*, void*);
+typedef void(*hightWaterMarkCallback)(struct session*, size_t, void*);
 typedef void(*messageCallback)(struct session*, struct buffer*);
-typedef int(*protoMessageCallback)(struct session*, 
-									const char* protoName, 
-									const char* cmd, 
-									uint32_t seq,
-									void* msg, 
-									size_t len);
+typedef void(*protoMessageCallback)(struct session*, void *data, size_t, void*);
 
 struct netCallback {
 	connectionCallback onConnection;

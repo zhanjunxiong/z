@@ -3,17 +3,19 @@
 #include "ae.h"
 #include "dict.h"
 #include "event_msgqueue.h"
+#include "thread.h"
 #include "z.h"
 
 #include <assert.h>
 #include <pthread.h>
 
 struct timer {
-	struct aeEventLoop* base;
-	struct em* em;
-	struct dict* timerDict;
+	struct aeEventLoop *base;
+	struct em *em;
+	struct dict *timerDict;
 	uint32_t sn;
 	pthread_mutex_t lock;
+	struct thread *timerThread; 
 };
 
 struct timerKey {
@@ -28,7 +30,7 @@ static struct timer* T = NULL;
 
 struct timerEvent {
 	uint32_t sn;
-	char to[CONTEXT_NAME_MAX_LEN];
+	int to;
 	union {
 		uint32_t session;
 		uint32_t sn;
@@ -61,23 +63,27 @@ void timerCancel(uint32_t sn) {
 	}
 }
 
-int timerTimeout(const char* to, int time, uint32_t session, int noMore) {
+int timerTimeout(int to, 
+				int time, 
+				uint32_t session, 
+				int noMore) {
 	if (time == 0) {
-		if (zSend(NULL, "", to, session, MSG_TYPE_RESPONSE, NULL, 0) < 0) {
+		if (zSend(NULL, 0, to, session, MSG_TYPE_RESPONSE, NULL, 0) < 0) {
+			fprintf(stderr, "send to(%d) fail", to);
 			return -1;
 		}
 	} else {
 		struct timerEvent* event = (struct timerEvent*)zcalloc(sizeof(*event));
-		memcpy(event->to, to, strlen(to));
+		event->to = to;
 		event->value.session = session;
 		event->noMore = noMore;
 		event->type = 0;
 		event->time = time;
+		event->sn = timerNewSn();
 		if (emPush(T->em, event) < 0 ) {
 			zfree(event);
 			return -1;
 		}
-		event->sn = timerNewSn();
 		return event->sn;
 	}
 
@@ -99,20 +105,34 @@ void timerMain() {
 	aeMain(T->base);
 }
 
+static void* timer(void* ud) {
+	timerMain();
+	return NULL;
+}
+
+int timerStart() {
+	threadStart(T->timerThread);
+	return 0;
+}
+
+void timerJoin() {
+	threadJoin(T->timerThread);
+}
+
 void eventFinalizerProc(struct aeEventLoop *eventLoop, void *clientData) {
 	zfree(clientData);
 }
 
 static int timeProc(struct aeEventLoop *eventLoop, long long id, void *clientData) {
 	struct timerEvent* event = (struct timerEvent*)clientData;
-	if (zSend(NULL, "", event->to, event->value.session, MSG_TYPE_RESPONSE, NULL, 0) < 0) {
+	if (zSend(NULL, 0, event->to, event->value.session, MSG_TYPE_RESPONSE, NULL, 0) < 0) {
 		return AE_NOMORE;
 	}	
 
 	if (event->noMore == 0) {
 		return AE_NOMORE;
 	}
-	return 0;
+	return event->time;
 }
 
 static void emCallback(void* msg, void* ud) {
@@ -179,11 +199,12 @@ dictType timerDictType = {
 int timerInit() {
 	assert(T == NULL);
 	T = (struct timer*)zmalloc(sizeof(*T));
-	T->base = aeCreateEventLoop();
-	T->em = emCreate(T->base, 128, emCallback, NULL);
+	T->base = aeCreateEventLoop(32);
+	T->em = emCreate(T->base, 1024, emCallback, NULL);
 	T->timerDict = dictCreate(&timerDictType, NULL);
 	T->sn = 0;
 	pthread_mutex_init(&T->lock, NULL); 
+	T->timerThread = threadCreate(timer, "timer");
 	return 0;
 }
 
@@ -193,6 +214,7 @@ void timerUninit() {
 	dictRelease(T->timerDict);
 	pthread_mutex_destroy(&T->lock); 
 	aeDeleteEventLoop(T->base);
+	threadRelease(T->timerThread);
 	zfree(T);
 }
 

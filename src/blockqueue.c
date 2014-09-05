@@ -38,10 +38,13 @@ void blockQueueRelease(struct blockQueue* queue) {
 	zfree(queue);
 }
 
-int blockQueuePut(struct blockQueue* queue, void* elem) {
+int blockQueuePush(struct blockQueue* queue, void* elem) {
 	pthread_mutex_lock(&queue->lock);
 	if (circQueuePushTail(queue->cq, elem)<0) {
 		pthread_mutex_unlock(&queue->lock);
+		fprintf(stderr, "please change queue length, or some error");
+		// todo exit??
+		// os.exit(1);
 		return -1;
 	}
 	pthread_cond_signal(&queue->cond);
@@ -49,19 +52,14 @@ int blockQueuePut(struct blockQueue* queue, void* elem) {
 	return 0;
 }
 
-#include "context.h"
-void blockQueueBroadcast(struct blockQueue* queue) {
-	static struct context ctx;
-	ctx.state = 2;
-
+void blockQueueExit(struct blockQueue* queue) {
 	pthread_mutex_lock(&queue->lock);
-	if (circQueuePushTail(queue->cq, (void*)&ctx) < 0) {
-		fprintf(stderr, "blockQueuBroadcase fail\n");
-	}
-	pthread_cond_broadcast(&queue->cond);
-	pthread_mutex_unlock(&queue->lock);
-}
-
+	if (circQueueForcePushTail(queue->cq, NULL) < 0) {
+		fprintf(stderr, "blockQueueExit fail, circQueueForcePushTail fail\n");
+	} 
+	pthread_cond_signal(&queue->cond);
+	pthread_mutex_unlock(&queue->lock); 
+} 
 
 void* blockQueueTake(struct blockQueue* queue) {
 	pthread_mutex_lock(&queue->lock);
@@ -73,13 +71,11 @@ void* blockQueueTake(struct blockQueue* queue) {
 	return elem;
 }
 
-size_t blockQueueLength(struct blockQueue* queue) {
-	int len = 0;
+uint32_t blockQueueLength(struct blockQueue* queue) {
+	uint32_t len = 0;
 	pthread_mutex_lock(&queue->lock);
 	len = circQueueLength(queue->cq);
 	pthread_mutex_unlock(&queue->lock);
 	return len;
-
 }
-
 

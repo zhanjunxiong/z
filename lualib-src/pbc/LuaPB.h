@@ -2,8 +2,10 @@
 #ifndef LUAPB_H_
 #define LUAPB_H_
 
+extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
+}
 #include <google/protobuf/message.h>
 
 typedef struct tagluamsg

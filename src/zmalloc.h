@@ -31,9 +31,10 @@
 #ifndef __ZMALLOC_H
 #define __ZMALLOC_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#define USE_JEMALLOC
+#define HAVE_ATOMIC
+
+#include <stdlib.h>
 
 /* Double expansion needed for stringification of macro values. */
 #define __xstr(s) __str(s)
@@ -69,8 +70,6 @@ extern "C" {
 #define ZMALLOC_LIB "libc"
 #endif
 
-#include <stddef.h>
-
 void *zmalloc(size_t size);
 void *zcalloc(size_t size);
 void *zrealloc(void *ptr, size_t size);
@@ -83,13 +82,10 @@ float zmalloc_get_fragmentation_ratio(size_t rss);
 size_t zmalloc_get_rss(void);
 size_t zmalloc_get_private_dirty(void);
 void zlibc_free(void *ptr);
+void* zlalloc(void *ud, void *ptr, size_t osize, size_t nsize);
 
 #ifndef HAVE_MALLOC_SIZE
 size_t zmalloc_size(void *ptr);
-#endif
-
-#ifdef __cplusplus
-}
 #endif
 
 #endif /* __ZMALLOC_H */

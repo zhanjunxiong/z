@@ -6,6 +6,7 @@ int daemonize(int nochdir, int noclose)
 
 	switch (fork()) {
 		case -1:
+			
 			return (-1);
 		case 0:
 			break;
@@ -32,6 +33,7 @@ int daemonize(int nochdir, int noclose)
 			perror("dup2 stdout");
 			return (-1);
 		}
+
 		if(dup2(fd, STDERR_FILENO) < 0) {
 			perror("dup2 stderr");
 			return (-1);

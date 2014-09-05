@@ -1,14 +1,19 @@
 #ifndef CTX_MGR_H_
 #define CTX_MGR_H_
 
-struct context;
-int ctxMgrAddContext(const char* name, struct context* ctx);
-int ctxMgrRemoveContext(const char* name);
-struct context* ctxMgrGetContext(const char* name);
-int ctxMgrHasWork();
+#include "context.h"
 
-int ctxMgrInit();
+struct context *ctxMgrCreateContext(const char *modname, 
+									const char *parm);
+void ctxMgrReleaseContext(struct context*);
+
+struct context *ctxMgrGetContext(uint32_t id);
+int ctxMgrGetContextNum();
+
+int ctxMgrInit(int setsize);
 void ctxMgrUninit();
+
+void ctxMgrStop();
 
 #endif
 

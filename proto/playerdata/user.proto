@@ -4,4 +4,6 @@ message User
 {
 	required int32 uid = 1;
 	optional string name = 2;
+	//  最近登录时间
+	optional int32 last_login_time = 3;
 }

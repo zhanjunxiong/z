@@ -235,6 +235,9 @@ _wmessage_new(lua_State *L) {
 	struct pbc_env * env = (struct pbc_env *)checkuserdata(L,1);
 	const char * type_name = luaL_checkstring(L,2);
 	struct pbc_wmessage * ret = pbc_wmessage_new(env, type_name);
+	if (!ret) {
+		return luaL_error(L,"new pb message error, (%s) is not exsit", type_name);
+	}
 	lua_pushlightuserdata(L,ret);
 	return 1;
 }

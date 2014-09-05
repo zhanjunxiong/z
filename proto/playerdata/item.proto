@@ -1,0 +1,18 @@
+package playerdata.item;
+
+message Item {
+	optional int32 sn = 1;
+	optional int32 id = 2;
+	optional int32 num = 3;
+}
+
+message CombatPack {
+	repeated Item items = 1;
+}
+
+
+message ItemPackage {
+	optional CombatPack combat_pack = 1;
+}
+
+

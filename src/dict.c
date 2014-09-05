@@ -172,7 +172,7 @@ static void _dictReset(dictht *ht)
 dict *dictCreate(dictType *type,
         void *privDataPtr)
 {
-    dict *d = (dict*)zmalloc(sizeof(*d));
+    dict *d = (dict *)zmalloc(sizeof(*d));
 
     _dictInit(d,type,privDataPtr);
     return d;
@@ -348,7 +348,7 @@ dictEntry *dictAddRaw(dict *d, void *key)
 
     /* Allocate the memory and store the new entry */
     ht = dictIsRehashing(d) ? &d->ht[1] : &d->ht[0];
-    entry = (dictEntry*)zmalloc(sizeof(*entry));
+    entry = (dictEntry *)zmalloc(sizeof(*entry));
     entry->next = ht->table[index];
     ht->table[index] = entry;
     ht->used++;
@@ -544,7 +544,7 @@ long long dictFingerprint(dict *d) {
 
 dictIterator *dictGetIterator(dict *d)
 {
-    dictIterator *iter = (dictIterator*)zmalloc(sizeof(*iter));
+    dictIterator *iter = (dictIterator *)zmalloc(sizeof(*iter));
 
     iter->d = d;
     iter->table = 0;

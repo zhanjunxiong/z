@@ -1,0 +1,15 @@
+package regist;
+message CREATE_ROLE 
+{
+	// @send
+	optional string uname = 1;
+	// @recv
+	// 0 成功
+	// -1 出错
+	// -2 名字长度不对
+	// -3 名字含非法字符
+	// -4 已经注册了
+	optional int32 errno = 2;
+}
+
+

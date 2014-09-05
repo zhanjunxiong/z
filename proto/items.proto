@@ -1,0 +1,13 @@
+package items;
+
+import "playerdata/item.proto";
+
+message ADD_ITEM {
+	optional int32 id = 1;
+	optional int32 num = 2;
+}
+
+message TEST {
+	optional playerdata.item.ItemPackage test = 1;
+}
+

@@ -1,8 +1,13 @@
 
-#include "mysql.h"
+#include <mysql.h>
+#include <my_sys.h>
+#include <my_global.h>
 
+extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
+}
+
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -15,40 +20,75 @@ struct zmysql{
     MYSQL *conn;
 };
 
-static int _create(lua_State *L){
-	struct zmysql* mysql = (struct zmysql*)lua_newuserdata(L, sizeof(*mysql));
+static int _thread_init(lua_State *L){
+	my_thread_init();
+	return 0;
+}
 
-	mysql->conn = mysql_init(NULL);
-	if (mysql->conn == NULL) {
-		luaL_error(L, "zmysql mysql_init fail\n");
-	}
+static int _thread_end(lua_State *L){
+	my_thread_end(); 
+	return 0;
+}
 
-	luaL_getmetatable(L, tname);
-	lua_setmetatable(L, -2);
-	return 1;
+
+static int _library_init(lua_State *L){
+	mysql_library_init(0, NULL, NULL);
+	return 0;
+}
+
+static int _library_end(lua_State *L){
+	mysql_library_end(); 
+	//my_end(0);
+	return 0;
+}
+
+static int _test(lua_State* L) {
+	return 0;
 }
 
 static int _connect(lua_State *L){
-	struct zmysql* mysql = (struct zmysql* )luaL_checkudata(L, 1, tname);
-	const char* host = luaL_checkstring(L, 2);
-	const char* dbname = luaL_checkstring(L, 3);
-	const char* user = luaL_checkstring(L, 4);
-	const char* passwd = luaL_checkstring(L, 5);
+	struct zmysql* mysql = (struct zmysql*)lua_newuserdata(L, sizeof(struct zmysql));
+
+
+	MYSQL* conn = mysql_init(NULL);
+	if (conn == NULL) {
+		luaL_error(L, "zmysql mysql_init fail\n");
+	}
+
+	const char* host = luaL_checkstring(L, 1);
+	const char* dbname = luaL_checkstring(L, 2);
+	const char* user = luaL_checkstring(L, 3);
+	const char* passwd = luaL_checkstring(L, 4);
 
 	my_bool b = true;
-	mysql_options(mysql->conn, MYSQL_OPT_RECONNECT, &b);
-	mysql->conn = mysql_real_connect(mysql->conn, host, user, passwd, dbname, 0, NULL, MYSQL_OPT_RECONNECT);
-	if (mysql->conn == NULL) {
+	mysql_options(conn, MYSQL_OPT_RECONNECT, &b);
+	if (mysql_real_connect(conn, 
+				host, 
+				user, 
+				passwd, 
+				dbname, 
+				0, 
+				NULL, 
+				MYSQL_OPT_RECONNECT) == NULL) {
+
+		mysql_close(conn);
+		mysql_thread_end();
 		luaL_error(L, "zmysql connect, host(%s), user(%s), passwd(%s), dbname(%s) fail, %s\n", 
 					host,
 					user,
 					passwd,
 					dbname,
-					mysql_error(mysql->conn));
+					mysql_error(conn));
+
 	}
 
-	mysql_query(mysql->conn, "set names utf8");
-	lua_pushboolean(L, true);
+	mysql_query(conn, "set names utf8");
+
+	mysql->conn = conn;
+
+	luaL_getmetatable(L, tname);
+	lua_setmetatable(L, -2);
+	
 	return 1;
 }
 
@@ -187,6 +227,7 @@ static int _close(lua_State *L){
 
     if(mysql->conn){
     	mysql_close(mysql->conn);
+		mysql_thread_end();
         mysql->conn = NULL;
     }
 
@@ -212,12 +253,16 @@ static int _ping(lua_State *L){
 }
 
 static luaL_Reg lib[] = {
-    {"create", _create},
+    {"connect", _connect},
+	{"library_end", _library_end},
+	{"library_init", _library_init},
+	{"thread_init", _thread_init},
+	{"thread_end", _thread_end},
+	{"test", _test},
     {NULL, NULL}
 };
 
 static luaL_Reg libm[] = {
-    {"connect", _connect},
     {"select", _select},
     {"command", _command},
     {"affected_rows", _affected_rows},
@@ -230,7 +275,7 @@ static luaL_Reg libm[] = {
 
 extern "C" int luaopen_zmysql(lua_State* L) {
 	luaL_checkversion(L);
-
+ 
 	luaL_newmetatable(L, tname);
 	lua_pushvalue(L, -1);
 	lua_setfield(L, -2, "__index");

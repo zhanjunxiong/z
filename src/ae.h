@@ -2,7 +2,7 @@
  * for the Jim's event-loop (Jim is a Tcl interpreter) but later translated
  * it in form of a library for easy reuse.
  *
- * Copyright (c) 2006-2010, Salvatore Sanfilippo <antirez at gmail dot com>
+ * Copyright (c) 2006-2012, Salvatore Sanfilippo <antirez at gmail dot com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,9 +33,7 @@
 #ifndef __AE_H__
 #define __AE_H__
 
-#include "zmalloc.h"
-
-#define AE_SETSIZE (1024*10)    /* Max number of fd supported */
+#include <time.h>
 
 #define AE_OK 0
 #define AE_ERR -1
@@ -89,10 +87,12 @@ typedef struct aeFiredEvent {
 
 /* State of an event based program */
 typedef struct aeEventLoop {
-    int maxfd;
+    int maxfd;   /* highest file descriptor currently registered */
+    int setsize; /* max number of file descriptors tracked */
     long long timeEventNextId;
-    aeFileEvent events[AE_SETSIZE]; /* Registered events */
-    aeFiredEvent fired[AE_SETSIZE]; /* Fired events */
+    time_t lastTime;     /* Used to detect system clock skew */
+    aeFileEvent *events; /* Registered events */
+    aeFiredEvent *fired; /* Fired events */
     aeTimeEvent *timeEventHead;
     int stop;
     void *apidata; /* This is used for polling API specific data */
@@ -100,12 +100,13 @@ typedef struct aeEventLoop {
 } aeEventLoop;
 
 /* Prototypes */
-aeEventLoop *aeCreateEventLoop(void);
+aeEventLoop *aeCreateEventLoop(int setsize);
 void aeDeleteEventLoop(aeEventLoop *eventLoop);
 void aeStop(aeEventLoop *eventLoop);
 int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
         aeFileProc *proc, void *clientData);
 void aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask);
+int aeGetFileEvents(aeEventLoop *eventLoop, int fd);
 long long aeCreateTimeEvent(aeEventLoop *eventLoop, long long milliseconds,
         aeTimeProc *proc, void *clientData,
         aeEventFinalizerProc *finalizerProc);
@@ -115,6 +116,7 @@ int aeWait(int fd, int mask, long long milliseconds);
 void aeMain(aeEventLoop *eventLoop);
 const char *aeGetApiName(void);
 void aeSetBeforeSleepProc(aeEventLoop *eventLoop, aeBeforeSleepProc *beforesleep);
+int aeGetSetSize(aeEventLoop *eventLoop);
+int aeResizeSetSize(aeEventLoop *eventLoop, int setsize);
 
 #endif
-

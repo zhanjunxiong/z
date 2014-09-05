@@ -37,3 +37,8 @@ message Ext {
 message AddressBook {
   repeated Person person = 1;
 }
+
+message OptAddressBook {
+  optional Person person = 1;
+}
+

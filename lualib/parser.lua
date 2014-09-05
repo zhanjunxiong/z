@@ -215,8 +215,9 @@ function deal:message(v)
 end
 
 local function fix(r)
+
 	local p = {}
-	for _,v in ipairs(r) do
+	for k,v in ipairs(r) do
 		local f = deal[v.type]
 		v.type = nil
 		f(p , v)

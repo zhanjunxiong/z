@@ -1,24 +1,24 @@
 
 #include "ae.h"
-#include "config.h"
+#include "env.h"
 #include "ctx_mgr.h"
 #include "daemon.h"
 #include "eventloop.h"
 #include "blockqueue.h"
 #include "module.h"
+#include "name_mgr.h"
 #include "queue.h"
 #include "context.h"
 #include "log.h"
 #include "event_msgqueue.h"
 #include "globalqueue.h"
 #include "thread.h"
-#include "tcp_server.h"
-#include "tcp_client.h"
+#include "tcp.h"
+#include "gen_tcp.h"
 #include "timer.h"
 #include "zmalloc.h"
+#include "worker_pool.h"
 
-#include <pthread.h>
-#include <unistd.h>
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
@@ -26,14 +26,29 @@
 #include <string.h>
 #include <signal.h>
 #include <stdarg.h>
+#include <pthread.h>
+#include <unistd.h>
 
-
-volatile bool shutdown = false;
-static void stop() {
-	shutdown = true;
-	eventloopStop();
-	timerStop();
+static void unSetupSignalHandlers() {
+	struct sigaction act;
+	
+	sigemptyset(&act.sa_mask);
+	act.sa_flags = 0;
+	act.sa_handler = SIG_IGN;
+	sigaction(SIGTERM, &act, NULL);
+	sigaction(SIGINT, &act, NULL);
 }
+
+
+static void stop() {
+	unSetupSignalHandlers();
+
+	timerStop();
+	ctxMgrStop();
+	workerPoolStop();
+	tcpStop();
+}
+
 
 static void sigterHandler(int sig) {
 	stop();	
@@ -47,6 +62,7 @@ static void setupSignalHandlers() {
 	act.sa_flags = 0;
 	act.sa_handler = sigterHandler;
 	sigaction(SIGTERM, &act, NULL);
+	sigaction(SIGINT, &act, NULL);
 
 #ifdef HAVE_BACKTRACE
 	sigemptyset(&act.sa_mask);
@@ -59,183 +75,130 @@ static void setupSignalHandlers() {
 #endif
 }
 
-
-static int messageDispatch() {
-	struct context* ctx = globalqueueTake(); 
-	if (ctx==NULL)
-		return 1;
-	if (ctx->state == 2)
-		return 1;
-
-	if (contextDispatchMessage(ctx) < 0) {
-		// 该上下位暂时没有事情做
-		__sync_lock_test_and_set(&ctx->state, 0);	
-	} else {
-		// 把ctx 重新放到调度队列中
-		globalqueuePut(ctx);
-	}
-	contextRelease(ctx);
-	return 0;
-}
-
-static void* timer() {
-	timerMain();
-
-	globalqueueExit();
-	return NULL;
-}
-
-static void* worker() {
-	while (true){
-		if (messageDispatch()) {
-			if (ctxMgrHasWork() == 0){
-				// 所有服务都处理完了,在退出循环
-				globalqueueExit();
-				break;
-			} else {
-				fprintf(stderr, "length: %d\n", globalqueueLength());
-			}
-		}
-	}
-	fprintf(stderr, "work exit\n");
-	return NULL;
-}
-
 static void start() {
-	int threadNum = configGetInt("thread_num", 4);
 
-	struct thread** threads = (struct thread**)zmalloc(threadNum*sizeof(struct thread*));
-	int i;
-	char name[50];
-	for (i=0; i < threadNum; i++) {
-		snprintf(name, 49, "workThread_%d", i);
-		threads[i] = threadCreate(worker, name);
-	}
-
-	for (i=0; i < threadNum; i++) {
-		threadStart(threads[i]);
-	}
-	struct thread* timerThread = threadCreate(timer, "timer");
-	threadStart(timerThread);
-
+	timerStart();
+	workerPoolStart();
 	eventloopStart();
 
-	threadJoin(timerThread);
+	// 1. setup signal
+	setupSignalHandlers();
 
-	threadRelease(timerThread);
-	for (i=0; i < threadNum; i++) {
-		threadJoin(threads[i]);
-		threadRelease(threads[i]);
-	}
-	zfree(threads);
+
+	timerJoin();
+	workerPoolJoin();
+	eventloopJoin();
+	logExit();
 }
 
 static void showVersion() {
-	fprintf(stdout, "z version is 0.1\n");
+	printf("z version is %.02f\n", Z_VERSION);
 	exit(1);
 }
 
 static void showHelp() {
-	fprintf(stdout, "help is nil\n");
+	printf("please use 'z help' instead!\n");
 	exit(1);
 }
 
-void vperror(const char *fmt, ...) {
-	int old_errno = errno;
-	char buf[1024];
-	va_list ap;
-
-	va_start(ap, fmt);
-	if (vsnprintf(buf, sizeof(buf), fmt, ap) == -1) {
-		buf[sizeof(buf) - 1] = '\0';
-	}
-	va_end(ap);
-	errno = old_errno;
-	perror(buf);
-}
-
-static void savePid(const pid_t pid, const char *pidFile) {
+static void savePid(const pid_t pid, const char *programName) {
 	FILE *fp;
-	if (pidFile == NULL)
+	if (programName == NULL)
 		return;
 
-	if ((fp = fopen(pidFile, "w")) == NULL) {
-		vperror("Could not open the pid file %s for writing", pidFile);
-		return;
+	char filename[FILENAME_MAX];
+	strncat(filename, Z_PID_PATH, strlen(Z_PID_PATH));
+	strncat(filename, programName, strlen(programName));
+	strncat(filename, ".pid", strlen(".pid"));
+
+	if ((fp = fopen(filename, "w+")) == NULL) {
+		logVperror("Could not open the pid file %s for writing", filename);
+		exit(0);
 	}
 
 	fprintf(fp,"%ld\n", (long)pid);
 	if (fclose(fp) == -1) {
-		vperror("Could not close the pid file %s", pidFile);
+		logVperror("Could not close the pid file %s", filename);
 		return;
 	}
 }
 
-static void removePidfile(const char *pidFile) {
-	if (pidFile == NULL)
+static void removePidfile(const char *programName) {
+	if (programName == NULL)
 		return;
 
-	if (unlink(pidFile) != 0) {
-		vperror("Could not remove the pid file %s", pidFile);
+	char filename[FILENAME_MAX];
+	strncat(filename, Z_PID_PATH, strlen(Z_PID_PATH));
+	strncat(filename, programName, strlen(programName));
+	strncat(filename, ".pid", strlen(".pid"));
+
+	if (unlink(filename) != 0) {
+		logVperror("Could not remove the pid file %s", filename);
 	}
 }
 
-static void init() {
-	const char* modulePath = configGet("modulePath", "./cservice/?.so;");
-
-	globalqueueInit();
-	ctxMgrInit();
-	eventloopInit();
-	tcpServerInit();
-	tcpClientInit();
-	timerInit();
-	moduleInit(modulePath);
-}
-
-static void bootstrap() {
-	const char* mainModName = configGet("bootstrap", "bootstrap");
-	struct context* ctx = contextCreate("bootstrap", "zlua", mainModName);
+static void bootstrap(const char* name) {
+	struct context* ctx = ctxMgrCreateContext("zlua", name);
 	if (ctx == NULL) {
-		fprintf(stderr, "load zlua main fail\n");
+		logVperror("load (%s) zlua fail\n", name);
+		ctxMgrCreateContext("zlua", "LOAD help ");
 		exit(1);
 	}
 }
 
+static uint32_t nextpow2(uint32_t num) {
+    --num;
+    num |= num >> 1;
+    num |= num >> 2;
+    num |= num >> 4;
+    num |= num >> 8;
+    num |= num >> 16;
+    return ++num;
+}
+
+static int init(const char *programName, bool do_daemonize) {
+	const char* modulePath = envGet("modulePath", "./cservice/?.so;");
+	int threadNum = envGetInt("thread_num", 4);
+	int fdSetSize = envGetInt("fd_size", 1024);
+	int ctxNum = envGetInt("ctx_num", 32);
+
+	fdSetSize = nextpow2(fdSetSize);
+	assert(logInit(programName, do_daemonize) == 0);
+	assert(globalqueueInit() == 0);
+	assert(ctxMgrInit(ctxNum) == 0);
+	assert(eventloopInit(fdSetSize) == 0);
+	assert(tcpInit(fdSetSize) == 0);
+	assert(timerInit() == 0);
+	assert(moduleInit(modulePath) == 0);
+	assert(workerPoolInit(threadNum) == 0);
+	assert(nameMgrInit() == 0);
+	return 0;
+}
+
 static void uninit() {
-	tcpServerUninit();
-	tcpClientUninit();
+	tcpUninit();
 	eventloopUninit();
 	globalqueueUninit();
 	timerUninit();
 	ctxMgrUninit();
-
 	moduleUninit();
+	nameMgrUninit();
+	workerPoolUninit();
+	logUninit();
 }
 
 int main(int argc, char **argv) {
-	// 
-	char* workDir = getenv("Z");
-	if (workDir) {
-		chdir(workDir);
-	}
-	// 
-	char path[FILENAME_MAX];
-	if(!getcwd(path, FILENAME_MAX)) {
-		fprintf(stderr, "z getcwd error\n");
-		return -1;
-	}
 
-	const char* configFileName = "config";
 	int o;
-	int maxcore = 0;
 	bool do_daemonize = false;
-	char* pidFileName = NULL;
+	const char* programName = NULL;
+	const char* envFileName = NULL;
 	while(-1 != (o = getopt(argc, argv,
 					"h" // show help
-					"f:" // config file name
 					"d" // run as a daemon
 					"v" // show version
-					"P:" // pid file name
+					"P:" // program name
+					"e:" // env config file
 					))) {
 		switch(o) {
 			case 'v':
@@ -247,44 +210,76 @@ int main(int argc, char **argv) {
 			case 'd':
 				do_daemonize = true;
 				break;
-			case 'f':
-				configFileName = optarg;
-				break;
 			case 'P':
-				pidFileName = optarg;
+				programName = optarg;
+				break;
+			case 'e':
+				envFileName = optarg;
+				break;
 			default:
 				showHelp();
 				return -1;
 		}
 	}
+	// 0 build bootstrap programe name
+	char bootstrapName[1024] = ""; 
+	int bootstrapNameSize = 0;
+	int bootname = 0;
+	int i;
+	for (i=0; optind<argc; i++,optind++) {
+		bootname = 1;
+		int argvLen = strlen(argv[optind]);
+		strncat(bootstrapName, argv[optind], argvLen);
+		strncat(bootstrapName, " ", 1);
+		bootstrapNameSize = bootstrapNameSize + argvLen + 1;
+	}
+	if (bootname == 0) {
+		strncat(bootstrapName, "help", strlen("help"));
+		strncat(bootstrapName, " ", 1);
+		bootstrapNameSize = bootstrapNameSize + strlen("help") + 1;
+	}
+	bootstrapName[bootstrapNameSize] = '\0';
+	bootstrapNameSize = bootstrapNameSize + 1;
+	assert(bootstrapNameSize < 1024);
 
+	// 2. change work dir 
+	char* workDir = getenv("Z");
+	if (workDir) {
+		chdir(workDir);
+	}
+	// 3. get current work dir
+	char path[FILENAME_MAX];
+	if(!getcwd(path, FILENAME_MAX)) {
+		logVperror("z getcwd error\n"); 
+		return -1;
+	}
+
+	if (programName == NULL) {
+		programName = Z_PROGNAME;
+	} 
+	// 4. check daemon
 	if (do_daemonize) {
-		if (daemonize(maxcore, 0) == -1) {
-			fprintf(stderr, "failed to daemon() in order to daemonize\n");
+		if (daemonize(1, 0) == -1) {
+			logVperror("failed to daemon() in order to daemonize\n");
 			return -1;
 		}
 
-		savePid(getpid(), pidFileName);
+		
+		savePid(getpid(), programName);
 	}
+	// 5. init env
+	assert(envInit(envFileName) == 0);
 
-	setupSignalHandlers();
+	init(programName, do_daemonize);
+	bootstrap(bootstrapName);
 
-	// init config
-	configInit(configFileName);
-
-	//logInit();
-
-	init();
-	bootstrap();
 	start();
 	uninit();
 
-	//logUninit();
-
-	configUninit();
+	envUninit();
 
 	if (do_daemonize) {
-		removePidfile(pidFileName);
+		removePidfile(programName);
 	}
 	return 0;
 }

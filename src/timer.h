@@ -3,11 +3,12 @@
 
 #include <stdint.h>
 
-int timerTimeout(const char* to, int time, uint32_t session, int noMore);
+int timerTimeout(int to, int time, uint32_t session, int noMore);
 void timerCancel(uint32_t id);
 
+int timerStart();
 void timerStop();
-void timerMain();
+void timerJoin();
 
 int timerInit();
 void timerUninit();

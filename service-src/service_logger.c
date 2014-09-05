@@ -35,6 +35,7 @@ static void _rotateFile(struct logger* inst, struct tm* tm) {
 		fclose(inst->handle);
 
 		char filePath[FILENAME_MAX];
+		memset(filePath, 0, FILENAME_MAX);
 		snprintf(filePath, FILENAME_MAX - 1, "%s/%s_%04d_%02d_%02d_%02d_%02d_%02d",
 							inst->rotateDir,
 							inst->name,
@@ -45,10 +46,17 @@ static void _rotateFile(struct logger* inst, struct tm* tm) {
 							tm->tm_min,
 							tm->tm_sec);
 		
+		/*
+		fprintf(stderr, "filepath: %s, rotatedir: %s, name: %s\n", 
+				filePath,
+				inst->rotateDir,
+				inst->name);
+		*/
+
 		rename(inst->name, filePath);
 		
 		inst->lineNum = 0;
-		inst->handle = fopen(inst->name,"w");
+		inst->handle = fopen(inst->name,"w+");
 		if (inst->handle == NULL) {
 			fprintf(stderr, "rotate file faile, open filename(%s) fail\n", inst->name);
 			return;
@@ -70,7 +78,7 @@ static int _logger(struct context* ctx,
 	struct tm* tm = localtime(&t.tv_sec);
 	_rotateFile(inst, tm); 
 
-	fprintf(inst->handle, "[%04d-%02d-%02d %02d:%02d:%02d:%06ld][%s][%s] ",
+	fprintf(inst->handle, "[%04d-%02d-%02d %02d:%02d:%02d:%06ld][%d][%s]",
 						tm->tm_year+1900,
 						tm->tm_mon+1,
 						tm->tm_mday,
@@ -89,16 +97,20 @@ static int _logger(struct context* ctx,
 }
 
 extern "C" struct logger* loggerCreate() {
-	struct logger* inst = (struct logger*)zmalloc(sizeof(*inst));
+	struct logger* inst = (struct logger*)zcalloc(sizeof(*inst));
 	inst->handle = NULL;
 	inst->close = 0;
+	inst->lineNum = 0;
 	return inst;
 }
 
 extern "C" int loggerInit(struct logger* inst, struct context* ctx, const char* parm) {
-	if (parm) {
+
+	if (parm && strcmp(parm, "") != 0) {
 		char p[strlen(parm) + 1];
+		memset(p, 0, strlen(parm) + 1);
 		memcpy(p, parm, strlen(parm));
+
 		char* tmp = p;
 		const char* name = strsep(&tmp, " \t\r\n");
 		if (name == NULL) {
@@ -107,16 +119,19 @@ extern "C" int loggerInit(struct logger* inst, struct context* ctx, const char* 
 		}
 		int maxLineNum = 200000;
 		const char* str = strsep(&tmp, " \t\r\n");
-		if (str == NULL) {
+		if (str) {
 			maxLineNum = atoi(str);
+
+			const char* rotateDir = strsep(&tmp, " \t\r\n");
+			if (rotateDir == NULL) {
+				rotateDir = "";
+			} else {
+				memset(inst->rotateDir, '\0', FILENAME_MAX);
+				memcpy(inst->rotateDir, rotateDir, strlen(rotateDir));
+			}
 		}
 
-		const char* rotateDir = strsep(&tmp, " \t\r\n");
-		if (rotateDir == NULL) {
-			rotateDir = "";
-		} else {
-			memcpy(inst->rotateDir, rotateDir, strlen(rotateDir));
-		}
+		memset(inst->name, 0, FILENAME_MAX);
 
 		memcpy(inst->name, name, strlen(name));
 		inst->maxLineNum = maxLineNum;
@@ -125,6 +140,14 @@ extern "C" int loggerInit(struct logger* inst, struct context* ctx, const char* 
 			return 1;
 		}
 		inst->close = 1;
+
+		/*	
+		fprintf(stderr, "filename: %s, maxlinenum: %d, rotateDir: %s\n", 
+						name,
+						inst->maxLineNum,
+						inst->rotateDir);
+		
+		*/
 	} else {
 		inst->handle = stdout;
 	}

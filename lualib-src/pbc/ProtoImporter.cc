@@ -30,7 +30,7 @@ ProtoImporter::ProtoImporter():
 	{
 		sourceTree.MapPath("", protopath);
 	}
-	printf("[ProtoImporter] protopath:%s\n", protopath);
+	//printf("[ProtoImporter] protopath:%s\n", protopath);
 }
 
 bool ProtoImporter::Import(const std::string& filename)

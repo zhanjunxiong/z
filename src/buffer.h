@@ -10,6 +10,8 @@ struct buffer;
 struct buffer* bufferCreate(uint32_t initSize);
 void bufferRelease(struct buffer*);
 
+void bufferReset(struct buffer*);
+
 char* bufferWriteIndex(struct buffer*);
 char* bufferReadIndex(struct buffer*);
 

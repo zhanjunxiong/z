@@ -6,7 +6,24 @@ message LOGIN
 	optional string password = 2;
 
 	// @recv
+	// 2 新手玩家
+	// 1 校验成功
 	// 0 登陆成功
-	// -1 登录失败
+	// -1 校验失败
+	// -2 加载玩家数据出错
+	// -3 玩家已经在线
 	optional int32 errno = 4;
 }
+
+
+message Player
+{
+	required int32 uid = 1;
+	optional string name = 2; 
+}
+
+message Test 
+{
+	optional Player player = 1;
+}
+

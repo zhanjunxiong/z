@@ -23,10 +23,10 @@ BlockCnt	lparser.c	/^typedef struct BlockCnt {$/;"	s	file:
 BlockCnt	lparser.c	/^} BlockCnt;$/;"	t	typeref:struct:BlockCnt	file:
 CAP_POSITION	lstrlib.c	195;"	d	file:
 CAP_UNFINISHED	lstrlib.c	194;"	d	file:
-CC	Makefile	/^CC= g++$/;"	m
+CC	Makefile	/^CC= gcc$/;"	m
 CClosure	lobject.h	/^typedef struct CClosure {$/;"	s
 CClosure	lobject.h	/^} CClosure;$/;"	t	typeref:struct:CClosure
-CFLAGS	Makefile	/^CFLAGS= -O2 -Wall -DLUA_COMPAT_ALL $(SYSCFLAGS) $(MYCFLAGS)$/;"	m
+CFLAGS	Makefile	/^CFLAGS= -O2 -g -Wall -DLUA_COMPAT_ALL $(SYSCFLAGS) $(MYCFLAGS)$/;"	m
 CIST_HOOKED	lstate.h	96;"	d
 CIST_HOOKYIELD	lstate.h	103;"	d
 CIST_LUA	lstate.h	95;"	d

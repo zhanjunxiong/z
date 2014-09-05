@@ -1,5 +1,6 @@
 #include "thread.h"
 
+#include "log.h"
 #include "zmalloc.h"
 
 #include <assert.h>
@@ -11,13 +12,13 @@ struct thread {
 	pid_t tid;
 	threadFunc func;
 	const char* name;
+	void* ud;
 };
-
 
 struct thread* threadCreate(threadFunc func, const char* name) {
 	struct thread* th = (struct thread*)zmalloc(sizeof(*th));
 	if (th == NULL)
-		return th;
+		return NULL;
 
 	th->started = false;
 	th->pthreadId = 0;
@@ -44,10 +45,12 @@ pid_t gettid() {
 
 void _runInThread(struct thread* th) {
 	th->tid = gettid();
-	th->func();
+	logInfo("start %s(%ld) thread", th->name, th->tid);
+	th->func(th);
+	logInfo("end %s(%ld) thread", th->name, th->tid);
 }
 
-void* _startThread(void* obj){
+static void* _startThread(void* obj){
 	struct thread* th = (struct thread*) obj;
 	_runInThread(th);
 	return NULL;
@@ -72,4 +75,5 @@ pid_t threadTid(struct thread* th) {
 const char* threadName(struct thread* th) {
 	return th->name;
 }
+
 

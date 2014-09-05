@@ -31,8 +31,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifdef __cplusplus
-#else
 /* This function provide us access to the original libc free(). This is useful
  * for instance to free results obtained by backtrace_symbols(). We need
  * to define this function before including zmalloc.h that may shadow the
@@ -40,7 +38,6 @@
 void zlibc_free(void *ptr) {
     free(ptr);
 }
-#endif
 
 #include <string.h>
 #include <pthread.h>
@@ -211,7 +208,7 @@ void zfree(void *ptr) {
 
 char *zstrdup(const char *s) {
     size_t l = strlen(s)+1;
-    char *p = (char*)zmalloc(l);
+    char *p = (char *)zmalloc(l);
 
     memcpy(p,s,l);
     return p;
@@ -351,3 +348,13 @@ size_t zmalloc_get_private_dirty(void) {
     return 0;
 }
 #endif
+
+void* zlalloc(void *ud, void *ptr, size_t osize, size_t nsize) {
+	if (nsize == 0) {
+		zfree(ptr);
+		return NULL;
+	} else {
+		return zrealloc(ptr, nsize);
+	}
+}
+

@@ -2,6 +2,7 @@
 
 #include "zmalloc.h"
 
+#include <stdio.h>
 #include <string.h>
 
 typedef struct circQueue {
@@ -11,11 +12,9 @@ typedef struct circQueue {
    uint32_t maxEntries;
    uint32_t arrayElements;
    void **entries;
-}circQueue;
-
+} circQueue;
 
 #define DEFAULT_UNBOUNDED_QUEUE_SIZE 1024
-
 static uint32_t nextpow2(uint32_t num) {
     --num;
     num |= num >> 1;
@@ -26,23 +25,12 @@ static uint32_t nextpow2(uint32_t num) {
     return ++num;
 }
 
-uint32_t circQueueLength(struct circQueue* cq) {
-	return cq->count;
-}
-
-bool circQueueIsEmpty(struct circQueue* cq) {
-	return cq->count == 0;
-}
-
-bool circQueueIsFull(struct circQueue* cq) {
-	return cq->count == cq->arrayElements;
-}
-
 struct circQueue* circQueueCreate(uint32_t size) {
    struct circQueue *cq = NULL;
 
-   if (!(cq = (struct circQueue*)zcalloc(sizeof(*cq)))) 
+   if (!(cq = (struct circQueue*)zcalloc(sizeof(*cq)))) {
       return NULL;
+   }
 
    cq->maxEntries = size;
    if (!size || !(cq->arrayElements = nextpow2(size))) {
@@ -61,6 +49,18 @@ struct circQueue* circQueueCreate(uint32_t size) {
 void circQueueRelease(struct circQueue *cq) {
    zfree(cq->entries);
    zfree(cq);
+}
+
+uint32_t circQueueLength(struct circQueue* cq) {
+	return cq->count;
+}
+
+bool circQueueIsEmpty(struct circQueue* cq) {
+	return cq->count == 0;
+}
+
+bool circQueueIsFull(struct circQueue* cq) {
+	return cq->count == cq->arrayElements;
 }
 
 int _circQueueGrow(struct circQueue *cq) {
@@ -95,10 +95,26 @@ int _circQueueGrow(struct circQueue *cq) {
    return 0;
 }
 
+int circQueueForcePushTail(struct circQueue* cq, void* elem) {
+	int ret = circQueuePushTail(cq, elem);
+	if (ret == 0) {
+		return ret;
+	}
+
+	if (_circQueueGrow(cq) == 0) {
+		ret = circQueuePushTail(cq, elem);
+	} else {
+		return -1;
+	}
+
+	return ret;
+}
+
 int circQueuePushTail(struct circQueue *cq, void *elem) {
    if (cq->maxEntries) {
       if (cq->count == cq->maxEntries) {
-         return -1;
+		  fprintf(stderr, "count: %d, maxEntries: %d\n", cq->count, cq->maxEntries);
+         return -2;
       }
    } else if (circQueueIsFull(cq) && _circQueueGrow(cq) != 0) {
       return -1;
@@ -113,8 +129,9 @@ int circQueuePushTail(struct circQueue *cq, void *elem) {
 
 void* circQueuePopHead(struct circQueue *cq) {
    void *data = NULL;
-   if (!cq->count) 
+   if (cq->count == 0) {
       return NULL;
+   }
    
    cq->count--;
    data = cq->entries[cq->head++];
@@ -123,4 +140,9 @@ void* circQueuePopHead(struct circQueue *cq) {
    return data;
 }
 
+void circQueueClear(struct circQueue *cq) {
+	cq->count = 0;
+	cq->head = 0;
+	cq->tail = 0;
+}
 

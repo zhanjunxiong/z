@@ -1,16 +1,11 @@
 #ifndef SESSION_H_
 #define SESSION_H_
 
-#include "callback.h"
+#include "define.h"
 
-#define IPADDR_LEN		128
-
-#define SESSION_NONE	 	0
-#define SESSION_READABLE 	1        //0001B
-#define SESSION_WRITEABLE 	2		 //0010B
-
+struct aeEventLoop;
+struct netCallback;
 struct buffer;
-struct session;
 
 enum StateE { 
 	kDisconnected, 
@@ -19,47 +14,54 @@ enum StateE {
 	kDisConnecting 
 };
 
-struct session {
-	uint32_t id;
-	int cfd;
-	uint32_t mask;
-
-	int cport;
-	char cip[IPADDR_LEN];
-	enum StateE	 state;
-
-	struct buffer* readBuffer;
-	struct buffer* sendBuffer;
-
-	struct aeEventLoop* base;
-
-	struct netCallback onNetCallback;
-	void* privateData;
-
-	union {
-		void* val;
-		struct tcpServer* srv;
-		struct tcpClient* client;
-	} owner;
-	// 协议名字
-	// 只是个指针,这个对象由tcpserver释放
-	char* protoName;
+enum SessionTypeE {
+	kSessionTypeNONE,
+	kSessionAcceptType,
+	kSessionSocketType,
+	kSessionConnectType,
 };
 
-struct session* sessionCreate();
-void sessionRelease(struct session* session);
+struct session {
+	int from;
+	enum SessionTypeE type;
 
-int32_t sessionRead(struct session* session, int*);
-int32_t sessionWrite(struct session* session, const void* buf, size_t len);
+	struct aeEventLoop *eventloop;
+	struct netCallback *cb;
 
-void sessionUpdateEvent(struct session* session);
-void sessionRemoveEvent(struct session* session); 
-void sessionCloseWriteEvent(struct session* session);
+	int protoType;
+	int destId;
 
-void sessionForceClose(struct session* session); 
+	int id;
+	int fd;
+	int port;
+	char ip[IPADDR_LEN];
 
-uint32_t newSessionid();
+	enum StateE state;
+
+	struct buffer *readBuffer;
+	struct buffer *sendBuffer;
+
+	void *ud;
+};
+
+struct session *sessionCreate(struct aeEventLoop *eventloop, int id, int fd);
+void sessionRelease(struct session *session);
+
+void sessionResetReadBuffer(struct session *session);
+
+void sessionAccept(struct session *session, int fd);
+int sessionConnect(struct session *session);
+int sessionStart(struct session *session);
+
+void sessionSetState(struct session *session, enum StateE state);
+void sessionSetud(struct session *session, void *ud);
+
+int sessionRead(struct session *session, int*);
+int sessionWrite(struct session *session, const void *buf, size_t len);
+
+int sessionForceClose(struct session *session); 
+
+int sessionBindfd(struct session *session, int fd);
 
 #endif 
-
 

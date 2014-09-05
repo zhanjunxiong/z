@@ -5,8 +5,10 @@
 #include <stdint.h>
 
 struct aeEventLoop;
-struct em;
 typedef void(*eventCallback)(void*, void*);
+typedef void(*exitEventCallback)();
+
+
 
 struct em* emCreate(struct aeEventLoop* base, 
 		unsigned int, 
@@ -16,6 +18,9 @@ void emRelease(struct em*);
 
 int emPush(struct em*, void*);
 uint32_t emLength(struct em*);
+
+void emExit(struct em*);
+void emSetExitCallback(struct em*, exitEventCallback);
 
 #endif
 

@@ -2,28 +2,40 @@
 
 #include "zmalloc.h"
 
+#include <assert.h>
 #include <string.h>
 
 struct buffer {
-	char* data;
-	uint32_t	size;
-	uint32_t	writeIndex;
-	uint32_t	readIndex;
+	uint32_t writeIndex;
+	uint32_t readIndex;
+	uint32_t initSize;
+	uint32_t size;
+	char *data;
 };
 
-static const uint32_t kCheapPrepend = 8;
+static const uint32_t kCheapPrepend = 0;
 struct buffer* bufferCreate(uint32_t initSize) {
 	struct buffer* buf = (struct buffer*)zcalloc(sizeof(*buf));
 	buf->data = NULL;
 	buf->readIndex = kCheapPrepend;
 	buf->writeIndex = kCheapPrepend;
 	buf->size = initSize;
+	buf->initSize = initSize;
 	if (initSize == 0) {
 		return buf;
 	}
 
 	buf->data = (char*)zmalloc(kCheapPrepend + initSize);
 	return buf;
+}
+
+void bufferReset(struct buffer* buf) {
+	assert(buf != NULL);
+
+	buf->size = buf->initSize;
+	buf->data = (char*)zmalloc(kCheapPrepend + buf->initSize);
+	buf->readIndex = kCheapPrepend;
+	buf->writeIndex = kCheapPrepend;
 }
 
 void bufferRelease(struct buffer* buf) {
@@ -142,7 +154,6 @@ int16_t bufferPeekInt16(struct buffer* buf) {
 	memcpy(&be16, bufferPeek(buf), sizeof(be16));
 	return be16;
 }
-
 
 int32_t bufferReadInt32(struct buffer* buf) {
 	int32_t ret = bufferPeekInt32(buf);

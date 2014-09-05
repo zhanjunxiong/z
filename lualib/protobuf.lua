@@ -507,6 +507,31 @@ function decode(typename, buffer, length)
 	end
 end
 
+local function _decode_all(tbl, indent)
+	indent = indent or 0
+	if indent > 10 then
+		return
+	end
+	for k, v in pairs(tbl) do
+		if type(v) == "table" then
+			_decode_all(v, indent + 1)
+		end
+	end
+end
+
+function decode_all(typename, buffer, length)
+	local ret = {}
+	local ok = c._decode(P, decode_message_cb , ret , typename, buffer, length)
+	if ok then
+		setmetatable(ret , default_table(typename))
+		_decode_all(ret)	
+		return ret
+	else
+		return false , c._last_error(P)
+	end
+end
+
+
 local function expand(tbl)
 	local typename = rawget(tbl , 1)
 	local buffer = rawget(tbl , 2)
@@ -553,3 +578,4 @@ function register_file(filename)
 end
 
 default=set_default
+

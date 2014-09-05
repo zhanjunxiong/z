@@ -1,5 +1,6 @@
 #include "module.h"
 
+#include "log.h"
 #include "zmalloc.h"
 
 #include <assert.h>
@@ -62,6 +63,7 @@ static void* _tryOpen(struct modules* m, const char* name) {
 	} else {
 		//fprintf(stderr, "try open %s success\n", name);
 	}
+
 	return dl;
 }
 
@@ -77,23 +79,18 @@ static struct module* _query(const char* name) {
 
 static int _openSym(struct module* mod){
 
-	dlerror();
-
 	size_t name_size = strlen(mod->name);
 	char tmp[name_size + 9];
 	memcpy(tmp, mod->name, name_size);
 	strcpy(tmp+name_size, "Create");
 	mod->create = (dlCreate)dlsym(mod->module, tmp);
-	dlerror();
 
 	strcpy(tmp+name_size, "Init");
 	mod->init = (dlInit)dlsym(mod->module, tmp);
-	dlerror();
 
 	strcpy(tmp+name_size, "Release");
 	mod->release = (dlRelease)dlsym(mod->module, tmp);
 	
-	dlerror();
 	return mod->init == NULL;
 }
 
@@ -161,18 +158,15 @@ int moduleInit(const char* path) {
 	m->path = zstrdup(path);
 	m->lock = 0;
 	M = m;
-
-	return 1;
+	return 0;
 }
 
 void moduleUninit() {
-	dlerror();
 	int i;
-	fprintf(stderr, "module count: %d\n", M->count);
 	for (i=0; i<M->count; i++) {
 		struct module m = M->m[i];
 		if (m.module) {
-			fprintf(stderr, "close module name: %s\n", m.name);
+			//logInfo("close module name: %s", m.name);
 			dlclose(m.module);
 		}
 		if (m.name) {

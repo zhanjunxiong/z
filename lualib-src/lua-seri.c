@@ -2,8 +2,11 @@
 #include "lua-seri.h"
 #include "zmalloc.h"
 
+extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
+}
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
@@ -575,7 +578,8 @@ int _luaseri_unpack(lua_State *L) {
 		_push_value(L, &rb, *t & 0x7, *t>>3);
 	}
 
-	// Need not free buffer
+	// don't free buffer
+	//zfree(buffer);
 
 	return lua_gettop(L);
 }
